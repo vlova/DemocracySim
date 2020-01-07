@@ -39,7 +39,7 @@ namespace Democracy.Simulations
                         {
                             VotersAmount = votersAmount,
                             WantedChooseProbability = wantedChooseProbability,
-                            TresholdQuantile = 0.2
+                            ThresholdQuantile = 0.2
                         });
 
                     var threshold50CrowdIQ = new ThresholdDemocracySimulation().ComputeRightVoteProbability(
@@ -47,7 +47,7 @@ namespace Democracy.Simulations
                         {
                             VotersAmount = votersAmount,
                             WantedChooseProbability = wantedChooseProbability,
-                            TresholdQuantile = 0.5
+                            ThresholdQuantile = 0.5
                         });
 
                     var factorCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(

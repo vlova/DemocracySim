@@ -29,7 +29,7 @@ namespace Democracy
                     var result = simulation.ComputeRightVoteProbability(new ThresholdDemocracySimulation.Settings
                     {
                         WantedChooseProbability = wantedChooseProbability,
-                        TresholdQuantile = treshold,
+                        ThresholdQuantile = treshold,
                         VotersAmount = votersAmount
                     });
 

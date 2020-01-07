@@ -1,4 +1,5 @@
 ﻿using MathNet.Numerics.Distributions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -10,7 +11,11 @@ namespace Democracy.Simulations
         {
             public int VotersAmount { get; set; }
 
+            public int ForcedWrongVotersAmount { get; set; }
+
             public double WantedChooseProbability { get; set; }
+
+            public HackMode HackMode { get; set; }
         }
 
         public double ComputeRightVoteProbability(Settings settings)
@@ -34,10 +39,7 @@ namespace Democracy.Simulations
                 },
                 RunOnce = () =>
                 {
-                    var crowdVote = new DecisionMaker(
-                        votersAmount: settings.VotersAmount,
-                        avgRightChooseProbability: settings.WantedChooseProbability
-                    ).MakeDecision();
+                    var crowdVote = new DecisionMaker(settings).MakeDecision();
 
                     return new StepResult
                     {
@@ -59,23 +61,22 @@ namespace Democracy.Simulations
 
         class DecisionMaker
         {
-            public int VotersAmount { get; }
+            public Settings Settings { get; set; }
 
-            private double AverageRightChooseProbability { get; }
-
-            public Vote[] Votes { get; set; }
+            public Vote?[] Votes { get; set; }
 
             private double[] RightChooseProbability { get; set; }
 
-            public DecisionMaker(int votersAmount, double avgRightChooseProbability)
+            public DecisionMaker(Settings settings)
             {
-                VotersAmount = votersAmount;
-                AverageRightChooseProbability = avgRightChooseProbability;
+                this.Settings = settings;
+                this.Votes = new Vote?[Settings.VotersAmount];
             }
 
             public Vote MakeDecision()
             {
                 InitHumanIQ();
+                HackHumans();
                 GetHumanDecision();
 
                 return GetDecision();
@@ -83,20 +84,53 @@ namespace Democracy.Simulations
 
             private void InitHumanIQ()
             {
-                this.RightChooseProbability = new double[VotersAmount];
-                for (var voterIndex = 0; voterIndex < VotersAmount; voterIndex++)
+                this.RightChooseProbability = new double[Settings.VotersAmount];
+                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
                 {
-                    this.RightChooseProbability[voterIndex] = Normal.Sample(mean: AverageRightChooseProbability, stddev: 0.15).Clamp(0, 1);
+                    this.RightChooseProbability[voterIndex] = Normal.Sample(
+                        mean: Settings.WantedChooseProbability,
+                        stddev: 0.15).Clamp(0, 1);
                 }
+            }
+
+            private void HackHumans()
+            {
+                for (var voterIndex = 0; voterIndex < Settings.ForcedWrongVotersAmount; voterIndex++)
+                {
+                    this.Votes[voterIndex] = GetVote();
+                }
+            }
+
+            private Vote GetVote()
+            {
+                if (this.Settings.HackMode == HackMode.ForceWrong)
+                {
+                    return Vote.Wrong;
+                }
+
+
+                if (this.Settings.HackMode == HackMode.ForceRandom)
+                {
+                    return GenerateVote(0.5);
+                }
+
+                if (this.Settings.HackMode == HackMode.ForceNoVote)
+                {
+                    return Vote.NoVote;
+                }
+
+                throw new ArgumentOutOfRangeException("this.Settings.HackMode is unknown");
             }
 
             private void GetHumanDecision()
             {
-                this.Votes = new Vote[VotersAmount];
-                for (var voterIndex = 0; voterIndex < VotersAmount; voterIndex++)
+                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
                 {
                     double rightChooseProbability = this.RightChooseProbability[voterIndex];
-                    this.Votes[voterIndex] = GenerateVote(rightChooseProbability);
+                    if (this.Votes[voterIndex] == null)
+                    {
+                        this.Votes[voterIndex] = GenerateVote(rightChooseProbability);
+                    }
                 }
             }
 
@@ -124,7 +158,8 @@ namespace Democracy.Simulations
         enum Vote
         {
             Right,
-            Wrong
+            Wrong,
+            NoVote
         }
     }
 }

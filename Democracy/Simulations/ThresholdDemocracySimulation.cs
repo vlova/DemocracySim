@@ -1,5 +1,6 @@
 ﻿using MathNet.Numerics.Distributions;
 using MathNet.Numerics.Statistics;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -11,14 +12,19 @@ namespace Democracy.Simulations
         {
             public int VotersAmount { get; set; }
 
+            public int ForcedWrongVotersAmount { get; set; }
+
             public double WantedChooseProbability { get; set; }
 
-            public double TresholdQuantile { get; internal set; }
+            public double ThresholdQuantile { get; set; }
+
+            public HackMode HackMode { get; set; }
         }
 
         public class SimulationResult
         {
             public double RightVoteProbability { get; set; }
+
             public double AverageRealVotersAmount { get; set; }
         }
 
@@ -44,11 +50,7 @@ namespace Democracy.Simulations
                 },
                 RunOnce = () =>
                 {
-                    var crowdVote = new DecisionMaker(
-                        votersAmount: settings.VotersAmount,
-                        avgRightChooseProbability: settings.WantedChooseProbability,
-                        thresholdQuantile: settings.TresholdQuantile
-                    ).MakeDecision();
+                    var crowdVote = new DecisionMaker(settings).MakeDecision();
 
                     return new StepResult
                     {
@@ -77,11 +79,7 @@ namespace Democracy.Simulations
 
         class DecisionMaker
         {
-            public int VotersAmount { get; }
-
-            private double AverageRightChooseProbability { get; }
-
-            private double TresholdQuantile { get; }
+            public Settings Settings { get; set; }
 
             public Vote?[] Votes { get; set; }
 
@@ -89,40 +87,69 @@ namespace Democracy.Simulations
 
             private double[] EstimatedIQ { get; set; }
 
-            private bool[] CanVote { get; set; }
+            private double[] VoteFactor { get; set; }
 
-            public DecisionMaker(int votersAmount, double avgRightChooseProbability, double thresholdQuantile)
+            public DecisionMaker(Settings settings)
             {
-                VotersAmount = votersAmount;
-                AverageRightChooseProbability = avgRightChooseProbability;
-                TresholdQuantile = thresholdQuantile;
+                this.Settings = settings;
+                this.Votes = new Vote?[Settings.VotersAmount];
             }
 
             public (Vote vote, int realVotersAmount) MakeDecision()
             {
                 InitHumanIQ();
+                HackHumans();
                 EstimateHumanIQ();
                 DecideWhoCanVote();
                 GetHumanDecision();
 
-                var realVotersAmount = this.CanVote.Where(c => c).Count();
+                var realVotersAmount = this.VoteFactor.Where(c => c > 0).Count();
 
                 return (GetDecision(), realVotersAmount);
             }
 
             private void InitHumanIQ()
             {
-                this.IQ = new double[VotersAmount];
-                for (var voterIndex = 0; voterIndex < VotersAmount; voterIndex++)
+                this.IQ = new double[Settings.VotersAmount];
+                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
                 {
-                    this.IQ[voterIndex] = Normal.Sample(mean: AverageRightChooseProbability, stddev: 0.15);
+                    this.IQ[voterIndex] = Normal.Sample(mean: Settings.WantedChooseProbability, stddev: 0.15);
                 }
+            }
+
+            private void HackHumans()
+            {
+                for (var voterIndex = 0; voterIndex < Settings.ForcedWrongVotersAmount; voterIndex++)
+                {
+                    this.Votes[voterIndex] = GetVote();
+                }
+            }
+
+            private Vote GetVote()
+            {
+                if (this.Settings.HackMode == HackMode.ForceWrong)
+                {
+                    return Vote.Wrong;
+                }
+
+
+                if (this.Settings.HackMode == HackMode.ForceRandom)
+                {
+                    return GenerateVote(0.5);
+                }
+
+                if (this.Settings.HackMode == HackMode.ForceNoVote)
+                {
+                    return Vote.NoVote;
+                }
+
+                throw new ArgumentOutOfRangeException("this.Settings.HackMode is unknown");
             }
 
             private void EstimateHumanIQ()
             {
-                this.EstimatedIQ = new double[VotersAmount];
-                for (var voterIndex = 0; voterIndex < VotersAmount; voterIndex++)
+                this.EstimatedIQ = new double[Settings.VotersAmount];
+                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
                 {
                     double estimateError = Normal.Sample(mean: 0, stddev: 0.5);
                     this.EstimatedIQ[voterIndex] = MathExt.Clamp(this.IQ[voterIndex] + estimateError, 0, 1);
@@ -131,22 +158,21 @@ namespace Democracy.Simulations
 
             private void DecideWhoCanVote()
             {
-                this.CanVote = new bool[VotersAmount];
-                var thresholdProbability = Statistics.Quantile(this.EstimatedIQ, this.TresholdQuantile);
-                for (var voterIndex = 0; voterIndex < VotersAmount; voterIndex++)
+                this.VoteFactor = new double[Settings.VotersAmount];
+                var thresholdProbability = Statistics.Quantile(this.EstimatedIQ, Settings.ThresholdQuantile);
+                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
                 {
-                    this.CanVote[voterIndex] = this.EstimatedIQ[voterIndex] >= thresholdProbability;
+                    this.VoteFactor[voterIndex] = this.EstimatedIQ[voterIndex] >= thresholdProbability ? 1 : 0;
                 }
             }
 
             private void GetHumanDecision()
             {
-                this.Votes = new Vote?[VotersAmount];
-                for (var voterIndex = 0; voterIndex < VotersAmount; voterIndex++)
+                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
                 {
-                    if (this.CanVote[voterIndex])
+                    double rightChooseProbability = MathExt.Clamp(this.IQ[voterIndex], min: 0, max: 1);
+                    if (this.Votes[voterIndex] == null)
                     {
-                        double rightChooseProbability = MathExt.Clamp(this.IQ[voterIndex], min: 0, max: 1);
                         this.Votes[voterIndex] = GenerateVote(rightChooseProbability);
                     }
                 }
@@ -161,8 +187,15 @@ namespace Democracy.Simulations
 
             private Vote GetDecision()
             {
-                var rightAmount = this.Votes.Where(v => v == Vote.Right).Sum(v => 1);
-                var wrongAmount = this.Votes.Where(v => v == Vote.Wrong).Sum(v => 1);
+                var rightAmount = this.Votes
+                    .Zip(this.VoteFactor, (vote, factor) => (vote, factor))
+                    .Where(v => v.vote == Vote.Right)
+                    .Sum(v => v.factor);
+
+                var wrongAmount = this.Votes
+                    .Zip(this.VoteFactor, (vote, factor) => (vote, factor))
+                    .Where(v => v.vote == Vote.Wrong)
+                    .Sum(v => v.factor);
 
                 if (rightAmount == wrongAmount)
                 {
@@ -176,7 +209,8 @@ namespace Democracy.Simulations
         enum Vote
         {
             Right,
-            Wrong
+            Wrong,
+            NoVote
         }
     }
 }
