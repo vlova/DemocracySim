@@ -3,7 +3,6 @@
     enum HackMode
     {
         ForceWrong,
-        ForceRandom,
-        ForceNoVote
+        ForceRandom
     }
 }

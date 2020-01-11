@@ -10,15 +10,15 @@ namespace Democracy.Simulations
     {
         public static void GenerateAndWriteToCSV()
         {
-            CsvWriter.WriteCSV(ComputeRecords(), "resistance-simulation.csv");
+            CsvWriter.WriteCSV(ComputeRecords(), "resistance-simulation-2.csv");
         }
 
         private static IEnumerable<CsvRecord> ComputeRecords()
         {
-            var votersAmounts = new[] { 10, 100, 500, 1000, 10000 };
-            var meanIQs = new[] { 0.5, 0.51, 0.49 }.Concat(Enumerable.Range(0, 21).Select(i => i * 0.05)).Distinct();
-            var forcedWrongVotersPercentages = new[] { 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0 };
-            var hackModes = new[] { HackMode.ForceRandom, HackMode.ForceWrong, HackMode.ForceNoVote };
+            var votersAmounts = new[] { 1, 2, 5, 10, 100, 500, 1000 };
+            var meanIQs = new[] { 0.45, 0.49, 0.5, 0.51, 0.49, 0.6, 0.7, 0.8 }.Distinct();
+            var forcedWrongVotersPercentages = Enumerable.Range(0, 101).Select(i => i * 0.01);
+            var hackModes = new[] { HackMode.ForceRandom, HackMode.ForceWrong };
 
             foreach (var votersAmount in votersAmounts)
             {
@@ -45,40 +45,12 @@ namespace Democracy.Simulations
 
         private static CsvRecord ComputeRecord(int votersAmount, double meanIQ, HackMode hackMode, double forcedWrongVotersPercentage)
         {
-            var forcedWrongVotersAmount = (int)Math.Floor(votersAmount * forcedWrongVotersPercentage);
 
             var naiveCrowdIQ = new NaiveDemocracySimulation().ComputeRightVoteProbability(new NaiveDemocracySimulation.Settings
             {
                 VotersAmount = votersAmount,
                 WantedChooseProbability = meanIQ,
-                ForcedWrongVotersAmount = forcedWrongVotersAmount,
-                HackMode = hackMode,
-            });
-
-            var threshold20IQ = new ThresholdDemocracySimulation().ComputeRightVoteProbability(new ThresholdDemocracySimulation.Settings
-            {
-                VotersAmount = votersAmount,
-                WantedChooseProbability = meanIQ,
-                ForcedWrongVotersAmount = forcedWrongVotersAmount,
-                ThresholdQuantile = 0.2,
-                HackMode = hackMode,
-            });
-
-            var threshold50IQ = new ThresholdDemocracySimulation().ComputeRightVoteProbability(new ThresholdDemocracySimulation.Settings
-            {
-                VotersAmount = votersAmount,
-                WantedChooseProbability = meanIQ,
-                ForcedWrongVotersAmount = forcedWrongVotersAmount,
-                ThresholdQuantile = 0.5,
-                HackMode = hackMode,
-            });
-
-            var threshold80IQ = new ThresholdDemocracySimulation().ComputeRightVoteProbability(new ThresholdDemocracySimulation.Settings
-            {
-                VotersAmount = votersAmount,
-                WantedChooseProbability = meanIQ,
-                ForcedWrongVotersAmount = forcedWrongVotersAmount,
-                ThresholdQuantile = 0.8,
+                ForcedWrongVotersPercentage = forcedWrongVotersPercentage,
                 HackMode = hackMode,
             });
 
@@ -86,7 +58,7 @@ namespace Democracy.Simulations
             {
                 VotersAmount = votersAmount,
                 WantedChooseProbability = meanIQ,
-                ForcedWrongVotersAmount = forcedWrongVotersAmount,
+                ForcedWrongVotersPercentage = forcedWrongVotersPercentage,
                 HackMode = hackMode,
             });
 
@@ -98,10 +70,7 @@ namespace Democracy.Simulations
                 WantedMeanIQ = meanIQ,
 
                 NaiveCrowdIQ = naiveCrowdIQ,
-                FactorCrowdIQ = factorCrowdIQ,
-                Treshold20CrowdIQ = threshold20IQ.RightVoteProbability,
-                Treshold50CrowdIQ = threshold50IQ.RightVoteProbability,
-                Treshold80CrowdIQ = threshold80IQ.RightVoteProbability
+                FactorCrowdIQ = factorCrowdIQ
             };
 
             return record;
@@ -121,15 +90,6 @@ namespace Democracy.Simulations
 
             [Format("0.000")]
             public double NaiveCrowdIQ { get; set; }
-
-            [Format("0.000")]
-            public double Treshold20CrowdIQ { get; set; }
-
-            [Format("0.000")]
-            public double Treshold50CrowdIQ { get; set; }
-
-            [Format("0.000")]
-            public double Treshold80CrowdIQ { get; set; }
 
             [Format("0.000")]
             public double FactorCrowdIQ { get; set; }

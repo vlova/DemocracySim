@@ -11,7 +11,7 @@ namespace Democracy.Simulations
         {
             public int VotersAmount { get; set; }
 
-            public int ForcedWrongVotersAmount { get; set; }
+            public double ForcedWrongVotersPercentage { get; set; }
 
             public double WantedChooseProbability { get; set; }
 
@@ -94,8 +94,9 @@ namespace Democracy.Simulations
             }
 
             private void HackHumans()
-            {
-                for (var voterIndex = 0; voterIndex < Settings.ForcedWrongVotersAmount; voterIndex++)
+            { 
+                var hackAmount = Settings.VotersAmount.GetPercentageWithRandomRounding(Settings.ForcedWrongVotersPercentage);
+                for (var voterIndex = 0; voterIndex < hackAmount; voterIndex++)
                 {
                     this.Votes[voterIndex] = GetVote();
                 }
@@ -112,11 +113,6 @@ namespace Democracy.Simulations
                 if (this.Settings.HackMode == HackMode.ForceRandom)
                 {
                     return GenerateVote(0.5);
-                }
-
-                if (this.Settings.HackMode == HackMode.ForceNoVote)
-                {
-                    return Vote.NoVote;
                 }
 
                 throw new ArgumentOutOfRangeException("this.Settings.HackMode is unknown");
