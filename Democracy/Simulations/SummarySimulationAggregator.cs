@@ -54,7 +54,8 @@ namespace Democracy.Simulations
                         new FactorDemocracySimulation.Settings
                         {
                             VotersAmount = votersAmount,
-                            WantedChooseProbability = wantedChooseProbability
+                            WantedChooseProbability = wantedChooseProbability,
+                            WeightModel = FactorDemocracySimulation.WeightModel.OptimisticPercentile
                         });
 
                     Console.WriteLine("MeanIQ " + wantedChooseProbability.ToString("0.000") +

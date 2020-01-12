@@ -17,6 +17,15 @@ namespace Democracy.Simulations
             public double WantedChooseProbability { get; set; }
 
             public HackMode HackMode { get; set; }
+
+            public WeightModel WeightModel { get; set; }
+        }
+
+        public enum WeightModel
+        {
+            OptimisticPercentile,
+            Strict,
+            PessimisticPercentile
         }
 
         public double ComputeRightVoteProbability(Settings settings)
@@ -143,6 +152,26 @@ namespace Democracy.Simulations
             {
                 this.VoteFactor = new double[Settings.VotersAmount];
 
+                if (this.Settings.WeightModel == WeightModel.OptimisticPercentile)
+                {
+                    ComputeVoteFactorByOptimisticPercentile();
+                }
+                else if (this.Settings.WeightModel == WeightModel.PessimisticPercentile)
+                {
+                    ComputeVoteFactorByPessimisticPercentile();
+                }
+                else if (this.Settings.WeightModel == WeightModel.Strict)
+                {
+                    ComputeVoteFactorByStrictDivision();
+                }
+                else
+                {
+                    throw new NotImplementedException();
+                }
+            }
+
+            private void ComputeVoteFactorByOptimisticPercentile()
+            {
                 var quantile25 = Statistics.Quantile(this.EstimatedIQ, 0.25);
                 var quantile50 = Statistics.Quantile(this.EstimatedIQ, 0.50);
                 var quantile75 = Statistics.Quantile(this.EstimatedIQ, 0.75);
@@ -167,6 +196,68 @@ namespace Democracy.Simulations
                     {
                         this.VoteFactor[voterIndex] = +1;
                     }
+                }
+            }
+
+            private void ComputeVoteFactorByPessimisticPercentile()
+            {
+                var quantile25 = Statistics.Quantile(this.EstimatedIQ, 0.25);
+                var quantile50 = Statistics.Quantile(this.EstimatedIQ, 0.50);
+                var quantile75 = Statistics.Quantile(this.EstimatedIQ, 0.75);
+
+                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
+                {
+                    var estimatedIq = this.EstimatedIQ[voterIndex];
+
+                    if (estimatedIq <= quantile25)
+                    {
+                        this.VoteFactor[voterIndex] = -1;
+                    }
+                    else if (estimatedIq <= quantile50)
+                    {
+                        this.VoteFactor[voterIndex] = -0.5;
+                    }
+                    else if (estimatedIq <= quantile75)
+                    {
+                        this.VoteFactor[voterIndex] = +0.5;
+                    }
+                    else
+                    {
+                        this.VoteFactor[voterIndex] = +1;
+                    }
+                }
+            }
+
+            private void ComputeVoteFactorByStrictDivision()
+            {
+                var voterIndexesSortedByIQ = this.EstimatedIQ.Select((iq, voterIndex) => (iq, voterIndex))
+                                        .OrderBy(p => p.iq).ThenBy(p => p.voterIndex)
+                                        .Select(p => p.voterIndex)
+                                        .ToArray();
+
+                for (var i = 0; i < voterIndexesSortedByIQ.Length; i++)
+                {
+                    var voterIndex = voterIndexesSortedByIQ[i];
+                    var weight = 0.0;
+
+                    if (i < voterIndexesSortedByIQ.Length * 0.25)
+                    {
+                        weight = -1;
+                    }
+                    else if (i < voterIndexesSortedByIQ.Length * 0.5)
+                    {
+                        weight = -0.5;
+                    }
+                    else if (i < voterIndexesSortedByIQ.Length * 0.75)
+                    {
+                        weight = +0.5;
+                    }
+                    else
+                    {
+                        weight = +1;
+                    }
+
+                    this.VoteFactor[voterIndex] = weight;
                 }
             }
 

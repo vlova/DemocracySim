@@ -32,7 +32,8 @@ namespace Democracy.Simulations
                 var factorCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(new FactorDemocracySimulation.Settings
                 {
                     VotersAmount = votersAmount,
-                    WantedChooseProbability = wantedChooseProbability
+                    WantedChooseProbability = wantedChooseProbability,
+                    WeightModel = FactorDemocracySimulation.WeightModel.OptimisticPercentile
                 });
 
                 Console.WriteLine("Voters " + votersAmount +

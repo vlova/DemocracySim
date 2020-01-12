@@ -10,13 +10,13 @@ namespace Democracy.Simulations
     {
         public static void GenerateAndWriteToCSV()
         {
-            CsvWriter.WriteCSV(ComputeRecords(), "resistance-simulation-2.csv");
+            CsvWriter.WriteCSV(ComputeRecords(), "resistance-simulation.csv");
         }
 
         private static IEnumerable<CsvRecord> ComputeRecords()
         {
             var votersAmounts = new[] { 1, 2, 5, 10, 100, 500, 1000 };
-            var meanIQs = new[] { 0.45, 0.49, 0.5, 0.51, 0.49, 0.6, 0.7, 0.8 }.Distinct();
+            var meanIQs = new[] { 0.2, 0.3, 0.4, 0.45, 0.49, 0.5, 0.51, 0.55, 0.6, 0.7, 0.8 };
             var forcedWrongVotersPercentages = Enumerable.Range(0, 101).Select(i => i * 0.01);
             var hackModes = new[] { HackMode.ForceRandom, HackMode.ForceWrong };
 
@@ -54,12 +54,31 @@ namespace Democracy.Simulations
                 HackMode = hackMode,
             });
 
-            var factorCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(new FactorDemocracySimulation.Settings
+            var optimisticPercentileWeightedCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(new FactorDemocracySimulation.Settings
             {
                 VotersAmount = votersAmount,
                 WantedChooseProbability = meanIQ,
                 ForcedWrongVotersPercentage = forcedWrongVotersPercentage,
                 HackMode = hackMode,
+                WeightModel = FactorDemocracySimulation.WeightModel.OptimisticPercentile
+            });
+
+            var pessimisticPercentileWeightedCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(new FactorDemocracySimulation.Settings
+            {
+                VotersAmount = votersAmount,
+                WantedChooseProbability = meanIQ,
+                ForcedWrongVotersPercentage = forcedWrongVotersPercentage,
+                HackMode = hackMode,
+                WeightModel = FactorDemocracySimulation.WeightModel.PessimisticPercentile
+            });
+
+            var strictWeightedCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(new FactorDemocracySimulation.Settings
+            {
+                VotersAmount = votersAmount,
+                WantedChooseProbability = meanIQ,
+                ForcedWrongVotersPercentage = forcedWrongVotersPercentage,
+                HackMode = hackMode,
+                WeightModel = FactorDemocracySimulation.WeightModel.Strict
             });
 
             var record = new CsvRecord
@@ -70,7 +89,9 @@ namespace Democracy.Simulations
                 WantedMeanIQ = meanIQ,
 
                 NaiveCrowdIQ = naiveCrowdIQ,
-                FactorCrowdIQ = factorCrowdIQ
+                OptimisticPercentileWeightedIQ = optimisticPercentileWeightedCrowdIQ,
+                PessimisticPercentileWeightedIQ = pessimisticPercentileWeightedCrowdIQ,
+                StrictWeightedCrowdIQ = strictWeightedCrowdIQ,
             };
 
             return record;
@@ -92,7 +113,13 @@ namespace Democracy.Simulations
             public double NaiveCrowdIQ { get; set; }
 
             [Format("0.000")]
-            public double FactorCrowdIQ { get; set; }
+            public double OptimisticPercentileWeightedIQ { get; set; }
+
+            [Format("0.000")]
+            public double PessimisticPercentileWeightedIQ { get; set; }
+
+            [Format("0.000")]
+            public double StrictWeightedCrowdIQ { get; set; }
         }
     }
 }
