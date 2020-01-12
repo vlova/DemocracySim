@@ -74,7 +74,6 @@ namespace Democracy.Simulations
                             WantedChooseProbability = wantedChooseProbability,
                             WeightModel = FactorDemocracySimulation.WeightModel.Strict2Groups
                         });
-                        });
 
                     Console.WriteLine("MeanIQ " + wantedChooseProbability.ToString("0.000") +
                         " | Voters " + votersAmount +
