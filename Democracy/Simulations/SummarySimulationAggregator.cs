@@ -15,7 +15,7 @@ namespace Democracy.Simulations
 
         private static IEnumerable<CsvRecordSummary> GetSummaryRecords()
         {
-            foreach (var wantedChooseProbability in Enumerable.Range(0, 21).Select(i => i * 0.05))
+            foreach (var wantedChooseProbability in Enumerable.Range(0, 21).Select(i => i * 0.05).Reverse())
             {
                 var naiveHumanIQ = new NaiveDemocracySimulation().ComputeRightVoteProbability(
                     new NaiveDemocracySimulation.Settings
@@ -25,7 +25,7 @@ namespace Democracy.Simulations
                     });
 
 
-                foreach (var votersAmount in new[] { 10, 100, 1000, 10000, 100000 })
+                foreach (var votersAmount in new[] { 5, 10, 25, 50, 75, 100, 150, 1000, 10000 })
                 {
                     var naiveCrowdIQ = new NaiveDemocracySimulation().ComputeRightVoteProbability(
                         new NaiveDemocracySimulation.Settings
@@ -50,7 +50,7 @@ namespace Democracy.Simulations
                             ThresholdQuantile = 0.5
                         });
 
-                    var factorCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(
+                    var optimisticPercentileWeightedCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(
                         new FactorDemocracySimulation.Settings
                         {
                             VotersAmount = votersAmount,
@@ -58,10 +58,28 @@ namespace Democracy.Simulations
                             WeightModel = FactorDemocracySimulation.WeightModel.OptimisticPercentile
                         });
 
+                    var pessimisticPercentileWeightedCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(
+                        new FactorDemocracySimulation.Settings
+                        {
+                            VotersAmount = votersAmount,
+                            WantedChooseProbability = wantedChooseProbability,
+                            WeightModel = FactorDemocracySimulation.WeightModel.PessimisticPercentile
+                        });
+
+
+                    var strict2GroupsWeightedCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(
+                        new FactorDemocracySimulation.Settings
+                        {
+                            VotersAmount = votersAmount,
+                            WantedChooseProbability = wantedChooseProbability,
+                            WeightModel = FactorDemocracySimulation.WeightModel.Strict2Groups
+                        });
+                        });
+
                     Console.WriteLine("MeanIQ " + wantedChooseProbability.ToString("0.000") +
                         " | Voters " + votersAmount +
                         " | Naive " + naiveCrowdIQ.ToString("0.000") +
-                        " | Factor " + factorCrowdIQ.ToString("0.000"));
+                        " | Factor " + optimisticPercentileWeightedCrowdIQ.ToString("0.000"));
 
                     yield return new CsvRecordSummary
                     {
@@ -70,7 +88,9 @@ namespace Democracy.Simulations
                         NaiveCrowdIQ = naiveCrowdIQ,
                         Threshold20IQ = threshold20CrowdIQ.RightVoteProbability,
                         Threshold50IQ = threshold50CrowdIQ.RightVoteProbability,
-                        FactorCrowdIQ = factorCrowdIQ
+                        OptimisticPercentileWeightedCrowdIQ = optimisticPercentileWeightedCrowdIQ,
+                        PessimisticPercentileWeightedCrowdIQ = pessimisticPercentileWeightedCrowdIQ,
+                        Strict2GroupsWeightedCrowdIQ = strict2GroupsWeightedCrowdIQ,
                     };
                 };
             }
@@ -93,7 +113,12 @@ namespace Democracy.Simulations
             public double Threshold50IQ { get; set; }
 
             [Format("0.000")]
-            public double FactorCrowdIQ { get; set; }
+            public double OptimisticPercentileWeightedCrowdIQ { get; set; }
+
+            [Format("0.000")]
+            public double PessimisticPercentileWeightedCrowdIQ { get; set; }
+
+            public double Strict2GroupsWeightedCrowdIQ { get; internal set; }
         }
     }
 }

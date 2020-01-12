@@ -19,13 +19,17 @@ namespace Democracy.Simulations
             public HackMode HackMode { get; set; }
 
             public WeightModel WeightModel { get; set; }
+
+            public double[] IQ { get; set; }
+
+            public double[] EstimatedIQ { get; set; }
         }
 
         public enum WeightModel
         {
             OptimisticPercentile,
-            Strict,
-            PessimisticPercentile
+            PessimisticPercentile,
+            Strict2Groups
         }
 
         public double ComputeRightVoteProbability(Settings settings)
@@ -94,23 +98,24 @@ namespace Democracy.Simulations
 
             public Vote MakeDecision()
             {
-                InitHumanIQ();
+                this.IQ = this.Settings.IQ ?? GenerateHumanIQ(this.Settings);
                 HackHumans();
-                EstimateHumanIQ();
+                this.EstimatedIQ = this.Settings.EstimatedIQ ?? EstimateHumanIQ(this.Settings, this.IQ);
                 ComputeVoteFactor();
                 GetHumanDecision();
 
                 return GetDecision();
             }
 
-
-            private void InitHumanIQ()
+            public static double[] GenerateHumanIQ(Settings settings)
             {
-                this.IQ = new double[Settings.VotersAmount];
-                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
+                var iq = new double[settings.VotersAmount];
+                for (var voterIndex = 0; voterIndex < settings.VotersAmount; voterIndex++)
                 {
-                    this.IQ[voterIndex] = Normal.Sample(mean: Settings.WantedChooseProbability, stddev: 0.15);
+                    iq[voterIndex] = Normal.Sample(mean: settings.WantedChooseProbability, stddev: 0.15);
                 }
+
+                return iq;
             }
 
             private void HackHumans()
@@ -138,14 +143,16 @@ namespace Democracy.Simulations
                 throw new ArgumentOutOfRangeException("this.Settings.HackMode is unknown");
             }
 
-            private void EstimateHumanIQ()
+            public static double[] EstimateHumanIQ(Settings settings, double[] IQ)
             {
-                this.EstimatedIQ = new double[Settings.VotersAmount];
-                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
+                var estimatedIQ = new double[settings.VotersAmount];
+                for (var voterIndex = 0; voterIndex < settings.VotersAmount; voterIndex++)
                 {
                     double estimateError = Normal.Sample(mean: 0, stddev: 0.5);
-                    this.EstimatedIQ[voterIndex] = MathExt.Clamp(this.IQ[voterIndex] + estimateError, 0, 1);
+                    estimatedIQ[voterIndex] = MathExt.Clamp(IQ[voterIndex] + estimateError, 0, 1);
                 }
+
+                return estimatedIQ;
             }
 
             private void ComputeVoteFactor()
@@ -160,9 +167,9 @@ namespace Democracy.Simulations
                 {
                     ComputeVoteFactorByPessimisticPercentile();
                 }
-                else if (this.Settings.WeightModel == WeightModel.Strict)
+                else if (this.Settings.WeightModel == WeightModel.Strict2Groups)
                 {
-                    ComputeVoteFactorByStrictDivision();
+                    ComputeVoteFactorByStrict2Groups();
                 }
                 else
                 {
@@ -228,29 +235,27 @@ namespace Democracy.Simulations
                 }
             }
 
-            private void ComputeVoteFactorByStrictDivision()
+            private void ComputeVoteFactorByStrict2Groups()
             {
                 var voterIndexesSortedByIQ = this.EstimatedIQ.Select((iq, voterIndex) => (iq, voterIndex))
                                         .OrderBy(p => p.iq).ThenBy(p => p.voterIndex)
                                         .Select(p => p.voterIndex)
                                         .ToArray();
 
+                var lengthAdopted = (voterIndexesSortedByIQ.Length / 2) * 2; // Floor happens here
+                var differenceCausedByFloor = voterIndexesSortedByIQ.Length - lengthAdopted;
                 for (var i = 0; i < voterIndexesSortedByIQ.Length; i++)
                 {
                     var voterIndex = voterIndexesSortedByIQ[i];
                     var weight = 0.0;
 
-                    if (i < voterIndexesSortedByIQ.Length * 0.25)
+                    if (i < lengthAdopted * 0.5)
                     {
                         weight = -1;
                     }
-                    else if (i < voterIndexesSortedByIQ.Length * 0.5)
+                    else if (i < lengthAdopted * 0.5 + differenceCausedByFloor)
                     {
-                        weight = -0.5;
-                    }
-                    else if (i < voterIndexesSortedByIQ.Length * 0.75)
-                    {
-                        weight = +0.5;
+                        weight = 0;
                     }
                     else
                     {

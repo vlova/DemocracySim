@@ -78,7 +78,7 @@ namespace Democracy.Simulations
                 WantedChooseProbability = meanIQ,
                 ForcedWrongVotersPercentage = forcedWrongVotersPercentage,
                 HackMode = hackMode,
-                WeightModel = FactorDemocracySimulation.WeightModel.Strict
+                WeightModel = FactorDemocracySimulation.WeightModel.Strict2Groups
             });
 
             var record = new CsvRecord
