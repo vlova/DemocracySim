@@ -1,4 +1,5 @@
-﻿using MathNet.Numerics.Distributions;
+﻿using Democracy.Common;
+using MathNet.Numerics.Distributions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +17,14 @@ namespace Democracy.Simulations
             public double WantedChooseProbability { get; set; }
 
             public HackMode HackMode { get; set; }
+
+            public CombinationMode CombinationMode { get; set; }
+        }
+
+        public enum CombinationMode
+        {
+            Naive,
+            Grouped
         }
 
         public double ComputeRightVoteProbability(Settings settings)
@@ -94,7 +103,7 @@ namespace Democracy.Simulations
             }
 
             private void HackHumans()
-            { 
+            {
                 var hackAmount = Settings.VotersAmount.GetPercentageWithRandomRounding(Settings.ForcedWrongVotersPercentage);
                 for (var voterIndex = 0; voterIndex < hackAmount; voterIndex++)
                 {
@@ -130,7 +139,7 @@ namespace Democracy.Simulations
                 }
             }
 
-            private Vote GenerateVote(double rightChooseProbability)
+            private static Vote GenerateVote(double rightChooseProbability)
             {
                 return ContinuousUniform.Sample(0, 1) > rightChooseProbability
                     ? Vote.Wrong
@@ -139,8 +148,50 @@ namespace Democracy.Simulations
 
             private Vote GetDecision()
             {
-                var rightAmount = this.Votes.Where(v => v == Vote.Right).Sum(v => 1);
-                var wrongAmount = this.Votes.Where(v => v == Vote.Wrong).Sum(v => 1);
+                if (this.Settings.CombinationMode == CombinationMode.Naive)
+                {
+                    return GetNaiveDecision(this.Votes);
+                }
+
+                if (this.Settings.CombinationMode == CombinationMode.Grouped)
+                {
+                    return GetGroupedDecision(this.Votes);
+                }
+
+                throw new NotImplementedException();
+            }
+
+            private static Vote GetGroupedDecision(Vote?[] votes)
+            {
+                const int groupsAmount = 11;
+
+                if (votes.Length < groupsAmount * 2)
+                {
+                    return GetNaiveDecision(votes);
+                }
+
+                var tries = Enumerable.Range(0, 100)
+                   .Select(_ => GetTryDecision(votes.GetShuffled(), groupsAmount));
+
+
+                return GetNaiveDecision(tries);
+            }
+
+            private static Vote? GetTryDecision(IEnumerable<Vote?> votes, int groupsAmount)
+            {
+                var groups = votes
+                    .Select((vote, index) => (vote, index))
+                    .GroupBy(_ => _.index % groupsAmount)
+                    .Select(g => g.Select(p => p.vote));
+
+                var groupVotes = groups.Select(GetNaiveDecision).Cast<Vote?>();
+                return GetNaiveDecision(groupVotes);
+            }
+
+            private static Vote GetNaiveDecision(IEnumerable<Vote?> votes)
+            {
+                var rightAmount = votes.Where(v => v == Vote.Right).Sum(v => 1);
+                var wrongAmount = votes.Where(v => v == Vote.Wrong).Sum(v => 1);
 
                 if (rightAmount == wrongAmount)
                 {

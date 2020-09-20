@@ -18,7 +18,7 @@ namespace Democracy.Simulations
 
             public HackMode HackMode { get; set; }
 
-            public WeightModel WeightModel { get; set; }
+            public IVoteFactorStrategy VoteFactorStrategy { get; set; }
 
             public double[] IQ { get; set; }
 
@@ -159,111 +159,15 @@ namespace Democracy.Simulations
             {
                 this.VoteFactor = new double[Settings.VotersAmount];
 
-                if (this.Settings.WeightModel == WeightModel.OptimisticPercentile)
-                {
-                    ComputeVoteFactorByOptimisticPercentile();
-                }
-                else if (this.Settings.WeightModel == WeightModel.PessimisticPercentile)
-                {
-                    ComputeVoteFactorByPessimisticPercentile();
-                }
-                else if (this.Settings.WeightModel == WeightModel.Strict2Groups)
-                {
-                    ComputeVoteFactorByStrict2Groups();
-                }
-                else
-                {
-                    throw new NotImplementedException();
-                }
-            }
+                var persons = this.IQ
+                    .Zip(this.EstimatedIQ, (iq, estimatedIQ) => new PersonWithEstimatedIQ
+                    {
+                        IQ = iq,
+                        EstimatedIQ = estimatedIQ
+                    }).ToList();
 
-            private void ComputeVoteFactorByOptimisticPercentile()
-            {
-                var quantile25 = Statistics.Quantile(this.EstimatedIQ, 0.25);
-                var quantile50 = Statistics.Quantile(this.EstimatedIQ, 0.50);
-                var quantile75 = Statistics.Quantile(this.EstimatedIQ, 0.75);
-
-                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
-                {
-                    var estimatedIq = this.EstimatedIQ[voterIndex];
-
-                    if (estimatedIq < quantile25)
-                    {
-                        this.VoteFactor[voterIndex] = -1;
-                    }
-                    else if (estimatedIq < quantile50)
-                    {
-                        this.VoteFactor[voterIndex] = -0.5;
-                    }
-                    else if (estimatedIq < quantile75)
-                    {
-                        this.VoteFactor[voterIndex] = +0.5;
-                    }
-                    else
-                    {
-                        this.VoteFactor[voterIndex] = +1;
-                    }
-                }
-            }
-
-            private void ComputeVoteFactorByPessimisticPercentile()
-            {
-                var quantile25 = Statistics.Quantile(this.EstimatedIQ, 0.25);
-                var quantile50 = Statistics.Quantile(this.EstimatedIQ, 0.50);
-                var quantile75 = Statistics.Quantile(this.EstimatedIQ, 0.75);
-
-                for (var voterIndex = 0; voterIndex < Settings.VotersAmount; voterIndex++)
-                {
-                    var estimatedIq = this.EstimatedIQ[voterIndex];
-
-                    if (estimatedIq <= quantile25)
-                    {
-                        this.VoteFactor[voterIndex] = -1;
-                    }
-                    else if (estimatedIq <= quantile50)
-                    {
-                        this.VoteFactor[voterIndex] = -0.5;
-                    }
-                    else if (estimatedIq <= quantile75)
-                    {
-                        this.VoteFactor[voterIndex] = +0.5;
-                    }
-                    else
-                    {
-                        this.VoteFactor[voterIndex] = +1;
-                    }
-                }
-            }
-
-            private void ComputeVoteFactorByStrict2Groups()
-            {
-                var voterIndexesSortedByIQ = this.EstimatedIQ.Select((iq, voterIndex) => (iq, voterIndex))
-                                        .OrderBy(p => p.iq).ThenBy(p => p.voterIndex)
-                                        .Select(p => p.voterIndex)
-                                        .ToArray();
-
-                var lengthAdopted = (voterIndexesSortedByIQ.Length / 2) * 2; // Floor happens here
-                var differenceCausedByFloor = voterIndexesSortedByIQ.Length - lengthAdopted;
-                for (var i = 0; i < voterIndexesSortedByIQ.Length; i++)
-                {
-                    var voterIndex = voterIndexesSortedByIQ[i];
-                    var weight = 0.0;
-
-                    if (i < lengthAdopted * 0.5)
-                    {
-                        weight = -1;
-                    }
-                    else if (i < lengthAdopted * 0.5 + differenceCausedByFloor)
-                    {
-                        weight = 0;
-                    }
-                    else
-                    {
-                        weight = +1;
-                    }
-
-                    this.VoteFactor[voterIndex] = weight;
-                }
+                var newPersons = this.Settings.VoteFactorStrategy.GetVoteFactor(persons);
+                this.VoteFactor = newPersons.Select(p => p.VoteFactor).ToArray();
             }
 
             private void GetHumanDecision()
@@ -305,6 +209,188 @@ namespace Democracy.Simulations
                 return rightAmount > wrongAmount ? Vote.Right : Vote.Wrong;
             }
         }
+
+        public class PersonWithEstimatedIQ
+        {
+            public double IQ { get; set; }
+
+            public double EstimatedIQ { get; set; }
+        }
+
+        public class PersonWithVoteFactor : PersonWithEstimatedIQ
+        {
+            public PersonWithVoteFactor(PersonWithEstimatedIQ person)
+            {
+                this.IQ = person.IQ;
+                this.EstimatedIQ = person.EstimatedIQ;
+            }
+
+            public double VoteFactor { get; set; }
+        }
+
+        public interface IVoteFactorStrategy
+        {
+            IEnumerable<PersonWithVoteFactor> GetVoteFactor(IReadOnlyList<PersonWithEstimatedIQ> persons);
+        }
+
+        public class VoteFactorStrategyByOptimisticPercentile : IVoteFactorStrategy
+        {
+            class Data
+            {
+                public double EstimatedIQ25;
+                public double EstimatedIQ50;
+                public double EstimatedIQ75;
+            }
+
+            private Data GetData(IReadOnlyList<PersonWithEstimatedIQ> persons)
+            {
+                var estimatedIQ = persons.Select(p => p.EstimatedIQ).ToArray();
+
+                return new Data
+                {
+                    EstimatedIQ25 = Statistics.Quantile(estimatedIQ, 0.25),
+                    EstimatedIQ50 = Statistics.Quantile(estimatedIQ, 0.5),
+                    EstimatedIQ75 = Statistics.Quantile(estimatedIQ, 0.75)
+                };
+            }
+
+            public IEnumerable<PersonWithVoteFactor> GetVoteFactor(IReadOnlyList<PersonWithEstimatedIQ> persons)
+            {
+                var data = GetData(persons);
+
+                for (var voterIndex = 0; voterIndex < persons.Count; voterIndex++)
+                {
+                    yield return new PersonWithVoteFactor(persons[voterIndex])
+                    {
+                        VoteFactor = GetVoteFactor(persons[voterIndex], data)
+                    };
+                }
+            }
+
+            private static double GetVoteFactor(PersonWithEstimatedIQ person, Data data)
+            {
+                var estimatedIq = person.EstimatedIQ;
+
+                double voteFactor;
+                if (estimatedIq < data.EstimatedIQ25)
+                {
+                    voteFactor = -1;
+                }
+                else if (estimatedIq < data.EstimatedIQ50)
+                {
+                    voteFactor = -0.5;
+                }
+                else if (estimatedIq < data.EstimatedIQ75)
+                {
+                    voteFactor = +0.5;
+                }
+                else
+                {
+                    voteFactor = +1;
+                }
+
+                return voteFactor;
+            }
+        }
+
+        public class VoteFactorStrategyByPessimisticPercentile : IVoteFactorStrategy
+        {
+            class Data
+            {
+                public double EstimatedIQ25;
+                public double EstimatedIQ50;
+                public double EstimatedIQ75;
+            }
+
+            private Data GetData(IReadOnlyList<PersonWithEstimatedIQ> persons)
+            {
+                var estimatedIQ = persons.Select(p => p.EstimatedIQ).ToArray();
+
+                return new Data
+                {
+                    EstimatedIQ25 = Statistics.Quantile(estimatedIQ, 0.25),
+                    EstimatedIQ50 = Statistics.Quantile(estimatedIQ, 0.5),
+                    EstimatedIQ75 = Statistics.Quantile(estimatedIQ, 0.75)
+                };
+            }
+
+            public IEnumerable<PersonWithVoteFactor> GetVoteFactor(IReadOnlyList<PersonWithEstimatedIQ> persons)
+            {
+                var data = GetData(persons);
+
+                for (var voterIndex = 0; voterIndex < persons.Count; voterIndex++)
+                {
+                    yield return new PersonWithVoteFactor(persons[voterIndex])
+                    {
+                        VoteFactor = GetVoteFactor(persons[voterIndex], data)
+                    };
+                }
+            }
+
+            private static double GetVoteFactor(PersonWithEstimatedIQ person, Data data)
+            {
+                var estimatedIq = person.EstimatedIQ;
+
+                double voteFactor;
+                if (estimatedIq <= data.EstimatedIQ25)
+                {
+                    voteFactor = -1;
+                }
+                else if (estimatedIq <= data.EstimatedIQ50)
+                {
+                    voteFactor = -0.5;
+                }
+                else if (estimatedIq <= data.EstimatedIQ75)
+                {
+                    voteFactor = +0.5;
+                }
+                else
+                {
+                    voteFactor = +1;
+                }
+
+                return voteFactor;
+            }
+        }
+
+        public class VoteFactorStrategyByStrict2Groups : IVoteFactorStrategy
+        {
+            public IEnumerable<PersonWithVoteFactor> GetVoteFactor(IReadOnlyList<PersonWithEstimatedIQ> persons)
+            {
+                var voterIndexesSortedByIQ = persons.Select(p => p.EstimatedIQ)
+                        .Select((iq, voterIndex) => (iq, voterIndex))
+                        .OrderBy(p => p.iq).ThenBy(p => p.voterIndex)
+                        .Select(p => p.voterIndex)
+                        .ToArray();
+
+                var lengthAdopted = (voterIndexesSortedByIQ.Length / 2) * 2; // Floor happens here
+                var differenceCausedByFloor = voterIndexesSortedByIQ.Length - lengthAdopted;
+                for (var i = 0; i < voterIndexesSortedByIQ.Length; i++)
+                {
+                    var voterIndex = voterIndexesSortedByIQ[i];
+                    var weight = 0.0;
+
+                    if (i < lengthAdopted * 0.5)
+                    {
+                        weight = -1;
+                    }
+                    else if (i < lengthAdopted * 0.5 + differenceCausedByFloor)
+                    {
+                        weight = 0;
+                    }
+                    else
+                    {
+                        weight = +1;
+                    }
+
+                    yield return new PersonWithVoteFactor(persons[voterIndex])
+                    {
+                        VoteFactor = weight
+                    };
+                }
+            }
+        }
+
 
         enum Vote
         {

@@ -33,7 +33,7 @@ namespace Democracy.Simulations
                 {
                     VotersAmount = votersAmount,
                     WantedChooseProbability = wantedChooseProbability,
-                    WeightModel = FactorDemocracySimulation.WeightModel.OptimisticPercentile
+                    VoteFactorStrategy = new FactorDemocracySimulation.VoteFactorStrategyByOptimisticPercentile(),
                 });
 
                 Console.WriteLine("Voters " + votersAmount +

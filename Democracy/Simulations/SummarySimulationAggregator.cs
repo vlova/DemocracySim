@@ -15,7 +15,7 @@ namespace Democracy.Simulations
 
         private static IEnumerable<CsvRecordSummary> GetSummaryRecords()
         {
-            foreach (var wantedChooseProbability in Enumerable.Range(0, 21).Select(i => i * 0.05).Reverse())
+            foreach (var wantedChooseProbability in Enumerable.Range(0, 41).Select(i => i * 0.025).Reverse())
             {
                 var naiveHumanIQ = new NaiveDemocracySimulation().ComputeRightVoteProbability(
                     new NaiveDemocracySimulation.Settings
@@ -25,14 +25,24 @@ namespace Democracy.Simulations
                     });
 
 
-                foreach (var votersAmount in new[] { 5, 10, 25, 50, 75, 100, 150, 1000, 10000 })
+                foreach (var votersAmount in new[] { 50, 100 }) // new[] { 5, 10, 25, 50, 75, 100, 150, 1000, 10000 })
                 {
                     var naiveCrowdIQ = new NaiveDemocracySimulation().ComputeRightVoteProbability(
                         new NaiveDemocracySimulation.Settings
                         {
                             VotersAmount = votersAmount,
-                            WantedChooseProbability = wantedChooseProbability
+                            WantedChooseProbability = wantedChooseProbability,
+                            CombinationMode = NaiveDemocracySimulation.CombinationMode.Naive
                         });
+
+                    var naiveGroupedCrowdIQ = new NaiveDemocracySimulation().ComputeRightVoteProbability(
+                        new NaiveDemocracySimulation.Settings
+                        {
+                            VotersAmount = votersAmount,
+                            WantedChooseProbability = wantedChooseProbability,
+                            CombinationMode = NaiveDemocracySimulation.CombinationMode.Grouped
+                        });
+
 
                     var threshold20CrowdIQ = new ThresholdDemocracySimulation().ComputeRightVoteProbability(
                         new ThresholdDemocracySimulation.Settings
@@ -55,7 +65,7 @@ namespace Democracy.Simulations
                         {
                             VotersAmount = votersAmount,
                             WantedChooseProbability = wantedChooseProbability,
-                            WeightModel = FactorDemocracySimulation.WeightModel.OptimisticPercentile
+                            VoteFactorStrategy = new FactorDemocracySimulation.VoteFactorStrategyByOptimisticPercentile(),
                         });
 
                     var pessimisticPercentileWeightedCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(
@@ -63,7 +73,7 @@ namespace Democracy.Simulations
                         {
                             VotersAmount = votersAmount,
                             WantedChooseProbability = wantedChooseProbability,
-                            WeightModel = FactorDemocracySimulation.WeightModel.PessimisticPercentile
+                            VoteFactorStrategy = new FactorDemocracySimulation.VoteFactorStrategyByPessimisticPercentile(),
                         });
 
 
@@ -72,7 +82,7 @@ namespace Democracy.Simulations
                         {
                             VotersAmount = votersAmount,
                             WantedChooseProbability = wantedChooseProbability,
-                            WeightModel = FactorDemocracySimulation.WeightModel.Strict2Groups
+                            VoteFactorStrategy = new FactorDemocracySimulation.VoteFactorStrategyByStrict2Groups(),
                         });
 
                     Console.WriteLine("MeanIQ " + wantedChooseProbability.ToString("0.000") +
@@ -85,6 +95,7 @@ namespace Democracy.Simulations
                         VotersAmount = votersAmount,
                         MeanIQ = naiveHumanIQ,
                         NaiveCrowdIQ = naiveCrowdIQ,
+                        NaiveGroupedCrowdIQ = naiveGroupedCrowdIQ,
                         Threshold20IQ = threshold20CrowdIQ.RightVoteProbability,
                         Threshold50IQ = threshold50CrowdIQ.RightVoteProbability,
                         OptimisticPercentileWeightedCrowdIQ = optimisticPercentileWeightedCrowdIQ,
@@ -104,6 +115,9 @@ namespace Democracy.Simulations
 
             [Format("0.000")]
             public double NaiveCrowdIQ { get; set; }
+
+            [Format("0.000")]
+            public double NaiveGroupedCrowdIQ { get; set; }
 
             [Format("0.000")]
             public double Threshold20IQ { get; set; }

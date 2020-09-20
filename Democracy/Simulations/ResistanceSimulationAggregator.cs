@@ -60,7 +60,7 @@ namespace Democracy.Simulations
                 WantedChooseProbability = meanIQ,
                 ForcedWrongVotersPercentage = forcedWrongVotersPercentage,
                 HackMode = hackMode,
-                WeightModel = FactorDemocracySimulation.WeightModel.OptimisticPercentile
+                VoteFactorStrategy = new FactorDemocracySimulation.VoteFactorStrategyByOptimisticPercentile(),
             });
 
             var pessimisticPercentileWeightedCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(new FactorDemocracySimulation.Settings
@@ -69,7 +69,7 @@ namespace Democracy.Simulations
                 WantedChooseProbability = meanIQ,
                 ForcedWrongVotersPercentage = forcedWrongVotersPercentage,
                 HackMode = hackMode,
-                WeightModel = FactorDemocracySimulation.WeightModel.PessimisticPercentile
+                VoteFactorStrategy = new FactorDemocracySimulation.VoteFactorStrategyByPessimisticPercentile(),
             });
 
             var strictWeightedCrowdIQ = new FactorDemocracySimulation().ComputeRightVoteProbability(new FactorDemocracySimulation.Settings
@@ -78,7 +78,7 @@ namespace Democracy.Simulations
                 WantedChooseProbability = meanIQ,
                 ForcedWrongVotersPercentage = forcedWrongVotersPercentage,
                 HackMode = hackMode,
-                WeightModel = FactorDemocracySimulation.WeightModel.Strict2Groups
+                VoteFactorStrategy = new FactorDemocracySimulation.VoteFactorStrategyByStrict2Groups(),
             });
 
             var record = new CsvRecord

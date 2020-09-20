@@ -9,9 +9,9 @@ namespace Democracy
         {
             NativeMethods.PreventSleep();
 
-            ResistanceSimulationAggregator.GenerateAndWriteToCSV();
-            ThresholdDemocracySimulationAggregator.GenerateAndWriteToCSV();
-            FactorDemocracySimulationAggregator.GenerateAndWriteToCSV();
+            //ResistanceSimulationAggregator.GenerateAndWriteToCSV();
+            //ThresholdDemocracySimulationAggregator.GenerateAndWriteToCSV();
+            //FactorDemocracySimulationAggregator.GenerateAndWriteToCSV();
             SummarySimulationAggregator.GenerateAndWriteToCSV();
         }
     }
